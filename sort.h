@@ -31,6 +31,6 @@ void selection_sort(int *array, size_t size);
 void quick_sort(int *array, size_t size);
 void qs(int *array, size_t size, ssize_t small, ssize_t high);
 size_t lomuto_partition(int *array, size_t size, ssize_t small, ssize_t high);
-void swap(int *array, int item1, int item2);
+void swap(int *array, size_t size, int *n1, int *n2);
 
 #endif
