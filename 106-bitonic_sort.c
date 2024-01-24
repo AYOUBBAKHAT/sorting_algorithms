@@ -1,133 +1,89 @@
 #include "sort.h"
-#include <stdlib.h>
+#include <stdio.h>
 
 /**
- * init_bucket_count - resets bucket_count values to 0
- * @bucket_count: array containing amounts of members for arrays in `buckets`
+ * bitonic_compare - helper to bitonic_merge, sorts contents of current
+ * subarray
+ * @up: if true, sort in ascending order, false, descending
+ * @x: subarray in current frame of recursion
+ * @size: number of elements in `x`
  */
-void init_bucket_count(int *bucket_count)
+void bitonic_compare(bool up, int *x, size_t size)
 {
-	int i;
+	size_t dist, i;
+	int temp;
 
-	for (i = 0; i < 10; i++)
-		bucket_count[i] = 0;
-}
-
-/**
- * build_buckets - allocates space for arrays to be held in `buckets`
- * @buckets: array of arrays each containing sorted members of `array`
- * @bucket_count: array containing amounts of members for arrays in `buckets`
- */
-void build_buckets(int *bucket_count, int **buckets)
-{
-	int *bucket;
-	int i;
-
-	for (i = 0; i < 10; i++)
+	dist = size / 2;
+	for (i = 0; i < dist; i++)
 	{
-		bucket = malloc(sizeof(int) * bucket_count[i]);
-		if (!bucket)
+		if ((x[i] > x[i + dist]) == up)
 		{
-			for (; i > -1; i--)
-				free(buckets[i]);
-			free(buckets);
-			exit(EXIT_FAILURE);
+			temp = x[i];
+			x[i] = x[i + dist];
+			x[i + dist] = temp;
 		}
-		buckets[i] = bucket;
 	}
-	init_bucket_count(bucket_count);
 }
 
 /**
- * find_max - searches array of integers for highest value
- * @array: array of values to be searched
- * @size: number of elements in array
- * Return: largest integer stored in array
+ * bitonic_merge - second recursive function of bitonic_sort, sorts subarrays
+ * via bitonic_compare, and merges the sorted results
+ * @up: if true, sort in ascending order, false, descending
+ * @x: subarray in previous frame of recursion
+ * @size: number of elements in `x`
+ * @orig_size: number of elements in source array being sorted
  */
-int find_max(int *array, size_t size)
+void bitonic_merge(bool up, int *x, size_t size, size_t orig_size)
 {
-	int max;
-	size_t i;
+	int *first, *second;
 
-	max = array[0];
-	for (i = 1; i < size; i++)
-		if (array[i] > max)
-			max = array[i];
-	return (max);
+	if (size > 1)
+	{
+		first = x;
+		second = x + (size / 2);
+		bitonic_compare(up, x, size);
+		bitonic_merge(up, first, size / 2, orig_size);
+		bitonic_merge(up, second, size / 2, orig_size);
+	}
 }
 
 /**
- * into_array - flattens buckets into array sorted by current digit place,
- * then prints results and frees current buckets for next pass
+ * bitonic_sort_r - first recursive engine of bitonic_sort, divides array
+ * into a binary tree of subarrays, and assigns sorting order.
+ * @up: if true, sort in ascending order, false, descending
+ * @x: subarray in previous frame of recursion
+ * @size: number of elements in `x`
+ * @orig_size: number of elements in source array being sorted
+ */
+void bitonic_sort_r(bool up, int *x, size_t size, size_t orig_size)
+{
+	int *first, *second;
+
+	if (size <= 1)
+		return;
+	first = x;
+	second = x + (size / 2);
+	printf("Merging [%lu/%lu] (%s):\n", size, orig_size,
+	       (up ? "UP" : "DOWN"));
+	print_array(x, size);
+	bitonic_sort_r(true, first, size / 2, orig_size);
+	bitonic_sort_r(false, second, size / 2, orig_size);
+	bitonic_merge(up, first, size, orig_size);
+	printf("Result [%lu/%lu] (%s):\n", size, orig_size,
+	       (up ? "UP" : "DOWN"));
+	print_array(x, size);
+}
+
+/**
+ * bitonic_sort - sorts array of integers in ascending order using a bitonic
+ * sort alogrithm
  * @array: array of values to be printed
  * @size: number of elements in array
- * @buckets: array of arrays each containing sorted members of `array`
- * @bucket_count: array containing amounts of members for arrays in `buckets`
  */
-void into_array(int *array, size_t size, int **buckets, int *bucket_count)
+void bitonic_sort(int *array, size_t size)
 {
-	int i, j, k;
-
-	/* flatten bucket members in order into array sorted by place */
-	for (k = 0, i = 0; k < 10; k++)
-	{
-		for (j = 0; j < bucket_count[k]; j++, i++)
-			array[i] = buckets[k][j];
-	}
-	/* print results */
-	print_array(array, size);
-	/* free buckets from current pass */
-	for (i = 0; i < 10; i++)
-		free(buckets[i]);
-}
-
-/**
- * radix_sort - Sorts array of integers in ascending order using a Radix sort
- * alogrithm starting with the LSD, the 'least significant (1s place) digit',
- * and sorting by next digit to left. Size of `bucket_count` here determined
- * by max range of key variance (digits 0-9), other solutions may be needed for
- * much larger ranges.
- * @array: array of values to be sorted
- * @size: number of elements in array
- */
-void radix_sort(int *array, size_t size)
-{
-	int **buckets;
-	int bucket_count[10];
-	int max, max_digits, pass, divisor, digit;
-	size_t i;
-
-	if (!array || size < 2)
+	if (!array || size == 0)
 		return;
-	buckets = malloc(sizeof(int *) * 10);
-	if (!buckets)
-		exit(1);
-	/* find amount of places in largest element */
-	max = find_max(array, size);
-	for (max_digits = 0; max > 0; max_digits++)
-		max /= 10;
-	/* one sorting pass for each place in max_digits */
-	for (pass = 0, divisor = 1; pass < max_digits; pass++, divisor *= 10)
-	{
-		init_bucket_count(bucket_count);
-		/* find amount of members in each bucket */
-		for (i = 0; i < size; i++)
-		{
-			digit = (array[i] / divisor) % 10;
-			bucket_count[digit]++;
-		}
-		build_buckets(bucket_count, buckets);
-		/* fill buckets sorting by digit at current power of 10 */
-		for (i = 0; i < size; i++)
-		{
-			/* find digit of source element at that power of 10 */
-			digit = (array[i] / divisor) % 10;
-			/* place member of source array in digit's bucket */
-			buckets[digit][bucket_count[digit]] = array[i];
-			/* record increase in bucket fill level */
-			bucket_count[digit]++;
-		}
-		into_array(array, size, buckets, bucket_count);
-	}
-	free(buckets);
+
+	bitonic_sort_r(true, array, size, size);
 }
